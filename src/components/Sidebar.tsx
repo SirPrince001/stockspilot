@@ -38,7 +38,7 @@ export default function Sidebar({ onQuickTransaction }: SidebarProps) {
             <Rocket className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-bold text-lg text-surface-bright leading-tight">Nexus ERP</h1>
+            <h1 className="font-bold text-lg text-surface-bright leading-tight">StockPilot</h1>
             <p className="text-[10px] text-outline-variant uppercase tracking-widest opacity-70">
               Enterprise Suite
             </p>

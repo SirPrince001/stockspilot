@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Package, AlertTriangle, CreditCard, Truck, Upload, Plus, Search, Filter, LayoutGrid, List, Edit3, Trash2 } from 'lucide-react';
+import { Package, AlertTriangle, CreditCard, Truck, Upload, Plus, Search, Filter, LayoutGrid, List, Edit3, Trash2, Loader2, TrendingUp } from 'lucide-react';
 import StatCard from '../components/StatCard';
-import { CATALOG_PRODUCTS } from '../constants';
+import { CATALOG_PRODUCTS as INITIAL_PRODUCTS } from '../constants';
 import { cn } from '../lib/utils';
+import ProductModal from '../components/ProductModal';
+import StockModal from '../components/StockModal';
 
 const pageVariants = {
   initial: { opacity: 0, y: 15 },
@@ -12,6 +14,51 @@ const pageVariants = {
 };
 
 export default function ProductCatalog() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [products, setProducts] = useState<any[]>(INITIAL_PRODUCTS);
+  const [loading, setLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/product/products');
+      if (response.ok) {
+        const data = await response.json();
+        // Merge with initial data for better demo
+        const uniqueProducts = [...data];
+        INITIAL_PRODUCTS.forEach(p => {
+          if (!uniqueProducts.find(up => up.sku === p.sku)) {
+            uniqueProducts.push(p);
+          }
+        });
+        setProducts(uniqueProducts);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateSuccess = (newProduct: any) => {
+    setProducts(prev => [newProduct, ...prev]);
+  };
+
+  const handleStockSuccess = (stock: any) => {
+    fetchProducts();
+  };
+
+  const openStockModal = (product: any) => {
+    setSelectedProduct(product);
+    setIsStockModalOpen(true);
+  };
+
   return (
     <motion.div 
       variants={pageVariants}
@@ -20,17 +67,33 @@ export default function ProductCatalog() {
       exit="exit"
       className="p-6 space-y-6"
     >
+      <ProductModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
+
+      <StockModal 
+        isOpen={isStockModalOpen}
+        onClose={() => setIsStockModalOpen(false)}
+        onSuccess={handleStockSuccess}
+        product={selectedProduct}
+      />
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold text-on-surface tracking-tight">Product Catalog</h2>
-          <p className="text-on-surface-variant text-sm mt-1 font-medium">Manage global product entities and stock levels across 12 branches.</p>
+          <p className="text-on-surface-variant text-sm mt-1 font-medium">Manage global product entities and stock levels.</p>
         </div>
         <div className="flex gap-3">
           <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-outline-variant rounded-xl font-bold text-xs text-on-surface hover:bg-surface-container-low transition-all active:scale-95 shadow-sm">
             <Upload className="w-4 h-4" />
             Export CSV
           </button>
-          <button className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold text-xs hover:bg-primary-container transition-all active:scale-95 shadow-lg shadow-primary/10">
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold text-xs hover:bg-primary-container transition-all active:scale-95 shadow-lg shadow-primary/10"
+          >
             <Plus className="w-4 h-4" />
             New Product
           </button>
@@ -124,7 +187,14 @@ export default function ProductCatalog() {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container-high">
-              {CATALOG_PRODUCTS.map((p) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-20 text-center">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-4" />
+                    <p className="text-outline font-bold uppercase tracking-widest text-[11px]">Synchronizing Catalog...</p>
+                  </td>
+                </tr>
+              ) : products.map((p) => (
                 <tr key={p.sku} className="hover:bg-surface-container-low/30 transition-colors group">
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-5">
@@ -142,16 +212,9 @@ export default function ProductCatalog() {
                   </td>
                   <td className="px-8 py-5 font-bold text-sm text-on-surface">{p.price}</td>
                   <td className="px-8 py-5">
-                    <div className="flex flex-col gap-2">
-                      <p className="text-xs font-bold text-on-surface">{p.stock.toLocaleString()} <span className="font-medium text-outline">pcs</span></p>
-                      <div className="w-28 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: p.stock > 100 ? '75%' : '15%' }}
-                          transition={{ duration: 1.2 }}
-                          className={cn("h-full", p.stock > 100 ? "bg-secondary" : "bg-error")} 
-                        />
-                      </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-sm font-bold text-on-surface">{p.stock.toLocaleString()}</p>
+                      <span className="text-[9px] font-black text-outline uppercase tracking-[0.15em] opacity-70">{p.unit || 'pcs'}</span>
                     </div>
                   </td>
                   <td className="px-8 py-5">
@@ -165,8 +228,12 @@ export default function ProductCatalog() {
                   </td>
                   <td className="px-8 py-5 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                      <button className="p-2 hover:bg-surface-container-high rounded-xl transition-colors text-outline" title="Adjustment">
-                        <Package className="w-4 h-4" />
+                      <button 
+                        onClick={() => openStockModal(p)}
+                        className="p-2 hover:bg-secondary/10 rounded-xl transition-colors text-secondary" 
+                        title="Add Stock"
+                      >
+                        <TrendingUp className="w-4 h-4" />
                       </button>
                       <button className="p-2 hover:bg-primary/10 rounded-xl transition-colors text-primary" title="Edit">
                         <Edit3 className="w-4 h-4" />

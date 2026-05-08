@@ -29,7 +29,7 @@ export default function Dashboard() {
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-on-background">System Overview</h2>
-          <p className="text-on-surface-variant text-sm">Real-time performance analytics for Nexus ERP network.</p>
+          <p className="text-on-surface-variant text-sm">Real-time performance analytics for StockPilot network.</p>
         </div>
         <div className="flex gap-3">
           <button className="px-4 py-2 bg-white border border-outline-variant text-sm font-semibold rounded-lg flex items-center gap-2 hover:bg-surface-container-low transition-colors shadow-sm">

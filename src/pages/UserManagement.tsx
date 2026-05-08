@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { UserPlus, Search, Mail, Phone, MoreHorizontal, UserCheck, Shield, MapPin, Filter } from 'lucide-react';
-import { ACTIVE_USERS } from '../constants';
+import { UserPlus, Search, Mail, Phone, MoreHorizontal, UserCheck, Shield, MapPin, Filter, Loader2, KeyRound } from 'lucide-react';
 import { cn } from '../lib/utils';
+import StaffModal from '../components/StaffModal';
+import RoleModal from '../components/RoleModal';
 
 const pageVariants = {
   initial: { opacity: 0, x: -20 },
@@ -11,6 +12,41 @@ const pageVariants = {
 };
 
 export default function UserManagement() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/user/users');
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStaffSuccess = (newStaff: any) => {
+    setUsers(prev => [newStaff, ...prev]);
+  };
+
+  const filteredUsers = users.filter(user => 
+    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.role.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <motion.div 
       variants={pageVariants}
@@ -19,17 +55,42 @@ export default function UserManagement() {
       exit="exit"
       className="p-6 space-y-6"
     >
+      <StaffModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleStaffSuccess}
+      />
+
+      <RoleModal 
+        isOpen={isRoleModalOpen}
+        onClose={() => setIsRoleModalOpen(false)}
+        onSuccess={(role) => {
+          // Success feedback already handled in modal, but we could refresh list if we had one
+          console.log('Role created:', role);
+        }}
+      />
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold text-on-surface tracking-tight">Staffing & User Management</h2>
           <p className="text-on-surface-variant text-sm mt-1 font-medium">Coordinate personnel across all regional branches and assigned departments.</p>
         </div>
         <div className="flex gap-3">
+          <button 
+            onClick={() => setIsRoleModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-bold text-xs hover:bg-surface-container-low transition-all shadow-sm"
+          >
+            <KeyRound className="w-4 h-4 text-primary" />
+            Create Role
+          </button>
           <button className="flex items-center gap-2 px-5 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-bold text-xs hover:bg-surface-container-low transition-all shadow-sm">
             <Shield className="w-4 h-4 text-primary" />
             Audit Logs
           </button>
-          <button className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold text-xs hover:bg-primary-container transition-all shadow-lg active:scale-95">
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold text-xs hover:bg-primary-container transition-all shadow-lg active:scale-95"
+          >
             <UserPlus className="w-4 h-4" />
             Invite New Staff
           </button>
@@ -41,8 +102,10 @@ export default function UserManagement() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-outline w-5 h-5 font-bold" />
           <input 
             className="w-full pl-12 pr-4 py-3 bg-surface-container-low border-none rounded-2xl focus:ring-2 focus:ring-primary/20 text-sm font-medium outline-none transition-all"
-            placeholder="Filter staff by name, email, or branch ID..."
+            placeholder="Filter staff by name, email, or role..."
             type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -57,60 +120,84 @@ export default function UserManagement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {ACTIVE_USERS.map((user) => (
-          <motion.div 
-            key={user.id} 
-            layoutId={user.id}
-            className="bg-surface-container-lowest p-6 rounded-[28px] shadow-[0px_4px_24px_rgba(0,0,0,0.04)] border border-surface-container-high flex flex-col hover:shadow-xl transition-all cursor-pointer group"
-          >
-            <div className="flex justify-between items-start mb-6">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-2xl overflow-hidden animate-in fade-in duration-500">
-                  <img src={user.img} alt={user.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-surface-container-lowest rounded-[32px] border border-surface-container-high">
+          <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
+          <p className="text-outline font-bold">Synchronizing staff registry...</p>
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-surface-container-lowest rounded-[32px] border border-surface-container-high">
+          <div className="p-4 bg-surface-container-low rounded-full mb-4">
+            <Search className="w-8 h-8 text-outline opacity-50" />
+          </div>
+          <p className="text-outline font-bold">No staff members found matching your criteria.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredUsers.map((user) => (
+            <motion.div 
+              key={user.id} 
+              layoutId={user.id}
+              className="bg-surface-container-lowest p-6 rounded-[28px] shadow-[0px_4px_24px_rgba(0,0,0,0.04)] border border-surface-container-high flex flex-col hover:shadow-xl transition-all cursor-pointer group"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-surface-container-low border border-surface-container">
+                    <img src={user.img} alt={user.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  </div>
+                  <div className={cn(
+                    "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white",
+                    user.status === 'Active' ? "bg-secondary" : "bg-error"
+                  )} />
                 </div>
-                <div className={cn(
-                  "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white",
-                  user.status === 'Active' ? "bg-secondary" : "bg-error"
-                )} />
+                <button className="p-2 text-outline-variant hover:bg-surface-container-low rounded-xl transition-colors">
+                  <MoreHorizontal className="w-5 h-5" />
+                </button>
               </div>
-              <button className="p-2 text-outline-variant hover:bg-surface-container-low rounded-xl transition-colors">
-                <MoreHorizontal className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="mb-6">
-              <h4 className="text-lg font-black text-on-surface tracking-tight group-hover:text-primary transition-colors">{user.name}</h4>
-              <p className="text-[11px] font-bold text-outline-variant uppercase tracking-widest mt-0.5">{user.role}</p>
-            </div>
+              <div className="mb-6">
+                <h4 className="text-lg font-black text-on-surface tracking-tight group-hover:text-primary transition-colors">{user.name}</h4>
+                <p className="text-[11px] font-bold text-outline-variant uppercase tracking-widest mt-0.5">{user.role}</p>
+              </div>
 
-            <div className="space-y-3 mb-8">
-              <div className="flex items-center gap-3 text-on-surface-variant">
-                <Mail className="w-4 h-4 text-outline" />
-                <span className="text-xs font-semibold">{user.email}</span>
+              <div className="space-y-3 mb-8">
+                <div className="flex items-center gap-3 text-on-surface-variant">
+                  <Mail className="w-4 h-4 text-outline" />
+                  <span className="text-xs font-semibold truncate">{user.email}</span>
+                </div>
+                {user.phone && (
+                  <div className="flex items-center gap-3 text-on-surface-variant">
+                    <Phone className="w-4 h-4 text-outline" />
+                    <span className="text-xs font-semibold">{user.phone}</span>
+                  </div>
+                )}
+                <div className="flex items-start gap-3 text-on-surface-variant">
+                  <MapPin className="w-4 h-4 text-outline mt-0.5" />
+                  <div className="flex flex-wrap gap-1">
+                    {user.branches && user.branches.map((branch: string, i: number) => (
+                      <span key={i} className="text-[10px] bg-surface-container-low px-2 py-0.5 rounded-md font-bold text-outline">
+                        {branch}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-on-surface-variant">
-                <Phone className="w-4 h-4 text-outline" />
-                <span className="text-xs font-semibold">{user.phone}</span>
-              </div>
-              <div className="flex items-center gap-3 text-on-surface-variant">
-                <MapPin className="w-4 h-4 text-outline" />
-                <span className="text-xs font-semibold">{user.branch}</span>
-              </div>
-            </div>
 
-            <div className="mt-auto pt-6 border-t border-surface-container-high flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-black text-on-surface uppercase tracking-widest">Full Access</span>
+              <div className="mt-auto pt-6 border-t border-surface-container-high flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-primary" />
+                  <span className="text-[10px] font-black text-on-surface uppercase tracking-widest">
+                    {user.role === 'Admin' ? 'Super Admin' : 'Branch Access'}
+                  </span>
+                </div>
+                <button className="px-4 py-1.5 bg-surface-container-low hover:bg-on-surface hover:text-white rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all">
+                  Manage Profile
+                </button>
               </div>
-              <button className="px-4 py-1.5 bg-surface-container-low hover:bg-on-surface hover:text-white rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all">
-                Manage Profile
-              </button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       <div className="bg-surface-container-lowest p-8 rounded-[32px] border border-surface-container-high shadow-sm flex flex-col md:flex-row justify-between items-center gap-8 border-l-[12px] border-secondary">
         <div className="flex items-center gap-6">
